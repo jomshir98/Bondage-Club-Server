@@ -1,9 +1,13 @@
 "use strict";
 require('newrelic');
 const base64id = require("base64id");
+const fs = require("fs");
 
 // Main game objects
-var App = require("http").createServer();
+var App = require("https").createServer({
+	cert: fs.readFileSync("~/fullchain.pem"),
+	key: fs.readFileSync("~/privkey.pem")
+});
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
 	cors: {
@@ -35,10 +39,10 @@ var ChatRoomProduction = [
 	process.env.PRODUCTION9 || "" 
 ];
 var NextMemberNumber = 1;
-var OwnershipDelay = 604800000; // 7 days delay for ownership events
-var LovershipDelay = 604800000; // 7 days delay for lovership events
-var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tiers
-const IP_CONNECTION_LIMIT = 64; // Limit of connections per IP address
+var OwnershipDelay = 0; // 7 days delay for ownership events
+var LovershipDelay = 0; // 7 days delay for lovership events
+var DifficultyDelay = 0; // 7 days to activate the higher difficulty tiers
+const IP_CONNECTION_LIMIT = Infinity; // Limit of connections per IP address
 const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
 
 // DB Access
