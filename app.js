@@ -5,8 +5,8 @@ const fs = require("fs");
 
 // Main game objects
 var App = require("https").createServer({
-	cert: fs.readFileSync("~/fullchain.pem"),
-	key: fs.readFileSync("~/privkey.pem")
+	cert: fs.readFileSync("/home/develop/fullchain.pem"),
+	key: fs.readFileSync("/home/develop/privkey.pem")
 });
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
