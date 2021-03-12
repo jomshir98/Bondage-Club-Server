@@ -11,7 +11,7 @@ var App = require("https").createServer({
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
 	cors: {
-		origin: [/https?:\/\/(www\.)?bondageprojects(\.elementfx)?.com(:[0-9]+)?/, /http:\/\/127.0.0.1(:[0-9]+)?/, /http:\/\/localhost(:[0-9]+)?/ ],
+		origin: "*",
 		credentials: true
 	},
 	maxHttpBufferSize: 200000,
@@ -256,10 +256,7 @@ function AccountCreate(data, socket) {
 
 // Gets the current environment for online play (www.bondageprojects.com is considered production)
 function AccountGetEnvironment(socket) {
-	if ((socket != null) && (socket.request != null) && (socket.request.headers != null) && (socket.request.headers.origin != null) && (socket.request.headers.origin != "")) {
-		if (ChatRoomProduction.indexOf(socket.request.headers.origin.toLowerCase()) >= 0) return "PROD";
-		else return "DEV";
-	} else return (Math.round(Math.random() * 1000000000000)).toString();
+	return "JOMSHIR";
 }
 
 // Makes sure the account data is valid, creates the missing fields if we need to
