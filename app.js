@@ -86,6 +86,7 @@ process.on('uncaughtException', function(error) {
 	});
 });
 
+/** @type {Map<string, number>} */
 const IPConnectionCounts = new Map();
 
 // Connects to the Mongo Database
@@ -110,7 +111,8 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 			// Sets up the Client/Server events
 			console.log("Bondage Club server is listening on " + (DatabasePort).toString());
 			console.log("****************************************");
-			IO.on("connection", function (socket) {
+			IO.on("connection", function ( /** @type {socketio.Socket} */ socket) {
+				/** @type {string} */
 				let address = socket.conn.remoteAddress;
 
 				// If there is trusted forward header set by proxy, use that instead
@@ -1013,7 +1015,12 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 	};
 }
 
-// Returns a ChatRoom data that can be synced to clients
+/**
+ * Returns a ChatRoom data that can be synced to clients
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ * @param {boolean} IncludeCharacters If the data should include full character info
+ */
 function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 {
 	// Exits right away if the chat room was destroyed
@@ -1055,7 +1062,12 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber, true));
 }
 
-// Syncs the room data with all of it's members
+/**
+ * Syncs the room data only to target
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber MemberNumber of account causing change
+ * @param {*} TargetMemberNumber The account to which the sync should be sent
+ */
 function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) { return; }
@@ -1073,6 +1085,13 @@ function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 }
 
 // TODO: remove this and every use of it after R67 release
+/**
+ * Syncs data to old clients in room
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ * @param {Account} [Source] If specified, the data won't be sent to source
+ * @returns {boolean} if any data was sent
+ */
 function ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source) {
 	if (CR == null) { return; }
 
@@ -1086,25 +1105,34 @@ function ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source) {
 	return false;
 }
 
-// Syncs the room data with all of it's members
+/**
+ * Syncs the room data with all of it's members
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ * @param {number} TargetMemberNumber The character to sync
+ */
 function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
 	const Target = CR.Account.find(Acc => Acc.MemberNumber === TargetMemberNumber);
 	if (!Target) return;
-	const Source = CR.Account.find(Acc => Acc.MemberNumber === SourceMemberNumber)
+	const Source = CR.Account.find(Acc => Acc.MemberNumber === SourceMemberNumber);
 	if (!Source) return;
 
-	let characterData = { }
-	characterData.SourceMemberNumber = SourceMemberNumber
+	let characterData = { };
+	characterData.SourceMemberNumber = SourceMemberNumber;
 	characterData.Character = ChatRoomSyncGetCharSharedData(Target);
 
 	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source))
 		Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncCharacter", characterData);
 }
 
-// Sends the newly joined player to all chat room members
+/**
+ * Sends the newly joined player to all chat room members
+ * @param {ChatRoom} CR
+ * @param {Account} Character
+ */
 function ChatRoomSyncMemberJoin(CR, Character) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
@@ -1130,12 +1158,16 @@ function ChatRoomSyncMemberJoin(CR, Character) {
 		ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
 }
 
-// Sends the left player to all chat room members
+/**
+ * Sends the left player to all chat room members
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber The leaving player
+ */
 function ChatRoomSyncMemberLeave(CR, SourceMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
-	let leaveData = { }
+	let leaveData = { };
 	leaveData.SourceMemberNumber = SourceMemberNumber;
 
 	// Sends the full packet to everyone in the room
@@ -1143,7 +1175,11 @@ function ChatRoomSyncMemberLeave(CR, SourceMemberNumber) {
 		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberLeave", leaveData);
 }
 
-// Syncs the room data with all of it's members
+/**
+ * Syncs the room data with all of it's members
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ */
 function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
@@ -1153,7 +1189,13 @@ function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
 		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncRoomProperties", ChatRoomGetData(CR, SourceMemberNumber, false));
 }
 
-// Syncs the room data with all of it's members
+/**
+ * Syncs the room data with all of it's members
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ * @param {number} MemberNumber1
+ * @param {number} MemberNumber2
+ */
 function ChatRoomSyncSwapPlayers(CR, SourceMemberNumber, MemberNumber1, MemberNumber2) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
@@ -1161,15 +1203,21 @@ function ChatRoomSyncSwapPlayers(CR, SourceMemberNumber, MemberNumber1, MemberNu
 	// Builds the room data
 	let swapData = {};
 
-	swapData.MemberNumber1 = MemberNumber1
-	swapData.MemberNumber2 = MemberNumber2
+	swapData.MemberNumber1 = MemberNumber1;
+	swapData.MemberNumber2 = MemberNumber2;
 
 	// Sends the full packet to everyone in the room
 	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
 		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncSwapPlayers", swapData);
 }
 
-// Syncs the room data with all of it's members
+/**
+ * Syncs the room data with all of it's members
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ * @param {number} TargetMemberNumber
+ * @param {"Left"|"Right"} Direction
+ */
 function ChatRoomSyncMovePlayer(CR, SourceMemberNumber, TargetMemberNumber, Direction) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
@@ -1177,15 +1225,20 @@ function ChatRoomSyncMovePlayer(CR, SourceMemberNumber, TargetMemberNumber, Dire
 	// Builds the room data
 	let moveData = {};
 
-	moveData.TargetMemberNumber = TargetMemberNumber
-	moveData.Direction = Direction
+	moveData.TargetMemberNumber = TargetMemberNumber;
+	moveData.Direction = Direction;
 
 	// Sends the full packet to everyone in the room
 	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
 		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMovePlayer", moveData);
 }
 
-// Syncs the room data with all of it's members
+/**
+ * Syncs the room data with all of it's members
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ * @param {number[]} NewPlayerOrder
+ */
 function ChatRoomSyncReorderPlayers(CR, SourceMemberNumber, NewPlayerOrder) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
@@ -1193,7 +1246,7 @@ function ChatRoomSyncReorderPlayers(CR, SourceMemberNumber, NewPlayerOrder) {
 	// Builds the room data
 	let reorderData = {};
 
-	reorderData.PlayerOrder = NewPlayerOrder
+	reorderData.PlayerOrder = NewPlayerOrder;
 
 	// Sends the full packet to everyone in the room
 	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
