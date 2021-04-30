@@ -1,3 +1,4 @@
+
 "use strict";
 require('newrelic');
 const base64id = require("base64id");
@@ -58,6 +59,7 @@ var DatabaseName = process.env.DATABASE_NAME || "BondageClubDatabase";
 var PasswordResetProgress = [];
 var NodeMailer = require("nodemailer");
 var MailTransporter = NodeMailer.createTransport({
+	// @ts-ignore
 	host: "mail.bondageprojects.com",
 	Port: 465,
 	secure: true,
@@ -118,6 +120,7 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				// If there is trusted forward header set by proxy, use that instead
 				// But only trust the last hop!
 				if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
+					// @ts-ignore
 					const hops = socket.handshake.headers[IP_CONNECTION_PROXY_HEADER].split(",");
 					address = hops[hops.length-1].trim();
 				}
@@ -697,6 +700,7 @@ function ChatRoomSearch(data, socket) {
 			if ((data.FullRooms != null) && (typeof data.FullRooms === "boolean")) FullRooms = data.FullRooms;
 
 			// Checks if the user opted to ignore certain rooms
+			/** @type {string[]} */
 			var IgnoredRooms = [];
 			if ((data.Ignore != null) && (Array.isArray(data.Ignore))) IgnoredRooms = data.Ignore;
 
@@ -1024,7 +1028,7 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 {
 	// Exits right away if the chat room was destroyed
-	if (CR == null) return;
+	if (CR == null) return undefined;
 
 	// Builds the room data
 	const R = {
@@ -1042,6 +1046,7 @@ function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 	};
 
 	if (IncludeCharacters) {
+		// @ts-ignore
 		R.Character = CR.Account.map(ChatRoomSyncGetCharSharedData);
 	}
 
@@ -1093,9 +1098,9 @@ function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
  * @returns {boolean} if any data was sent
  */
 function ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source) {
-	if (CR == null) { return; }
+	if (CR == null) { return false; }
 
-	if (CR.Account.some(C => C.OnlineSharedSettings?.GameVersion == "R66")) {
+	if (CR.Account.some(C => C.OnlineSharedSettings?.GameVersion == "R67")) {
 		const roomData = ChatRoomGetData(CR, SourceMemberNumber, true);
 		if (Source) Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
 		else IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
@@ -1130,12 +1135,13 @@ function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 
 /**
  * Sends the newly joined player to all chat room members
- * @param {ChatRoom} CR
+ * @param {Chatroom} CR
  * @param {Account} Character
  */
 function ChatRoomSyncMemberJoin(CR, Character) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
+	/** @type {{ SourceMemberNumber: number; Character: Partial<Account>, WhiteListedBy: number[]; BlackListedBy: number[] }} */
 	let joinData = {
 		SourceMemberNumber: Character.MemberNumber,
 		Character: ChatRoomSyncGetCharSharedData(Character),
@@ -1153,9 +1159,7 @@ function ChatRoomSyncMemberJoin(CR, Character) {
 	}
 
 	Character.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
-
-	if (!ChatRoomSyncToOldClients(CR, Character.MemberNumber))
-		ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
+	ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
 }
 
 /**
@@ -1171,8 +1175,7 @@ function ChatRoomSyncMemberLeave(CR, SourceMemberNumber) {
 	leaveData.SourceMemberNumber = SourceMemberNumber;
 
 	// Sends the full packet to everyone in the room
-	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberLeave", leaveData);
+	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberLeave", leaveData);
 }
 
 /**
@@ -1187,28 +1190,6 @@ function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
 	// Sends the full packet to everyone in the room
 	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
 		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncRoomProperties", ChatRoomGetData(CR, SourceMemberNumber, false));
-}
-
-/**
- * Syncs the room data with all of it's members
- * @param {Chatroom} CR
- * @param {number} SourceMemberNumber
- * @param {number} MemberNumber1
- * @param {number} MemberNumber2
- */
-function ChatRoomSyncSwapPlayers(CR, SourceMemberNumber, MemberNumber1, MemberNumber2) {
-	// Exits right away if the chat room was destroyed
-	if (CR == null) return;
-
-	// Builds the room data
-	let swapData = {};
-
-	swapData.MemberNumber1 = MemberNumber1;
-	swapData.MemberNumber2 = MemberNumber2;
-
-	// Sends the full packet to everyone in the room
-	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncSwapPlayers", swapData);
 }
 
 /**
@@ -1311,7 +1292,7 @@ function ChatRoomCharacterExpressionUpdate(data, socket) {
  * Updates a character pose for a chat room
  *
  * *This does not update the database*
- * @param {any} data
+ * @param {{ Pose?: string | string[] }} data
  * @param {socketio.Socket} socket
  */
 function ChatRoomCharacterPoseUpdate(data, socket) {
@@ -1390,7 +1371,7 @@ function ChatRoomAdmin(data, socket) {
 
 			// An administrator can update lots of room data.  The room values are sent back to the clients.
 			if (data.Action == "Update")
-				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (data.Room.Admin != null) && (Array.isArray(data.Room.Admin)) && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (data.Room.Ban != null) && (Array.isArray(data.Room.Ban)) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
+				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (data.Room.Admin != null) && (Array.isArray(data.Room.Admin)) && (!data.Room.Admin.some((/** @type {unknown} */ i) => !Number.isInteger(i))) && (data.Room.Ban != null) && (Array.isArray(data.Room.Ban)) && (!data.Room.Ban.some((/** @type {unknown} */ i) => !Number.isInteger(i)))) {
 					data.Room.Name = data.Room.Name.trim();
 					var LN = /^[a-zA-Z0-9 ]+$/;
 					if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
@@ -1440,7 +1421,11 @@ function ChatRoomAdmin(data, socket) {
 				if ((Acc != null) && (Acc.ChatRoom != null)) {
 					Acc.ChatRoom.Account[TargetAccountIndex] = DestinationAccount;
 					Acc.ChatRoom.Account[DestinationAccountIndex] = TargetAccount;
-					ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+					let newPlayerOrder = [];
+					for (let i = 0; i < Acc.ChatRoom.Account.length; i++) {
+						newPlayerOrder.push(Acc.ChatRoom.Account[i].MemberNumber);
+					}
+					ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber, newPlayerOrder);
 				}
 				return;
 			}
@@ -1467,29 +1452,40 @@ function ChatRoomAdmin(data, socket) {
 						}
 					}
 					else if ((data.Action == "MoveLeft") && (A != 0)) {
-						var MovedAccount = Acc.ChatRoom.Account[A];
+						let MovedAccount = Acc.ChatRoom.Account[A];
 						Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account[A - 1];
 						Acc.ChatRoom.Account[A - 1] = MovedAccount;
+						let newPlayerOrder = [];
+						for (let i = 0; i < Acc.ChatRoom.Account.length; i++) {
+							newPlayerOrder.push(Acc.ChatRoom.Account[i].MemberNumber);
+						}
 						Dictionary.push({Tag: "TargetCharacterName", Text: MovedAccount.Name, MemberNumber: MovedAccount.MemberNumber});
 						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 						if ((data.Publish != null) && (typeof data.Publish === "boolean") && data.Publish) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveLeft", "Action", null, Dictionary);
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber, newPlayerOrder);
 					}
 					else if ((data.Action == "MoveRight") && (A < Acc.ChatRoom.Account.length - 1)) {
-						var MovedAccount = Acc.ChatRoom.Account[A];
+						let MovedAccount = Acc.ChatRoom.Account[A];
 						Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account[A + 1];
 						Acc.ChatRoom.Account[A + 1] = MovedAccount;
+						let newPlayerOrder = [];
+						for (let i = 0; i < Acc.ChatRoom.Account.length; i++) {
+							newPlayerOrder.push(Acc.ChatRoom.Account[i].MemberNumber);
+						}
 						Dictionary.push({Tag: "TargetCharacterName", Text: MovedAccount.Name, MemberNumber: MovedAccount.MemberNumber});
 						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 						if ((data.Publish != null) && (typeof data.Publish === "boolean") && data.Publish) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveRight", "Action", null, Dictionary);
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber, newPlayerOrder);
 					}
 					else if (data.Action == "Shuffle") {
-						for (var X = 0; X < Acc.ChatRoom.Account.length; X++)
-							Acc.ChatRoom.Account.sort(() => Math.random() - 0.5);
+						let newPlayerOrder = []
+						Acc.ChatRoom.Account.sort(() => Math.random() - 0.5);
+						for (let i = 0; i < Acc.ChatRoom.Account.length; i++) {
+							newPlayerOrder.push(Acc.ChatRoom.Account[i].MemberNumber);
+						}
 						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerShuffle", "Action", null, Dictionary);
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber, newPlayerOrder);
 					}
 					else if ((data.Action == "Promote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) < 0)) {
 						Acc.ChatRoom.Admin.push(Acc.ChatRoom.Account[A].MemberNumber);
@@ -1643,7 +1639,7 @@ function PasswordReset(data, socket) {
 				};
 
 				// Sends the email and logs the result
-				MailTransporter.sendMail(mailOptions, function (err, info) {
+				MailTransporter.sendMail(mailOptions, function (/** @type {Error} */ err, /** @type {import("nodemailer").SentMessageInfo} */ info) {
 					if (err) {
 						console.log("Error while sending password reset email: " + err);
 						socket.emit("PasswordResetResponse", "EmailSentError");
@@ -1793,10 +1789,16 @@ function AccountOwnership(data, socket) {
 function AccountLovership(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
 
-		// Update the lovership and delete all unnecessary information
+		/**
+		 * Update the lovership and delete all unnecessary information
+		 * @param {Lovership[]} Lovership
+		 * @param {number} MemberNumber
+		 * @param {socketio.Socket} [CurrentSocket]
+		 * @param {boolean} [Emit]
+		 */
 		function AccountUpdateLovership(Lovership, MemberNumber, CurrentSocket = socket, Emit = true) {
 			var newLovership = Lovership.slice();
-			for (var L = newLovership.length - 1; L >= 0; L--) {
+			for (let L = newLovership.length - 1; L >= 0; L--) {
 				delete newLovership[L].BeginEngagementOfferedByMemberNumber;
 				delete newLovership[L].BeginWeddingOfferedByMemberNumber;
 				if (newLovership[L].BeginDatingOfferedByMemberNumber) newLovership.splice(L, 1);

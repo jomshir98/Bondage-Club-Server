@@ -1,0 +1,23 @@
+{
+    "compilerOptions": {
+        "target": "es2020",
+        "allowJs": true,
+        "checkJs": true,
+        "moduleResolution": "node",
+        "alwaysStrict": true,
+        "baseUrl": ".",
+        "paths": {
+            "*": [
+                "node_modules/*"
+            ]
+        },
+        "noEmit": true,
+
+        "noImplicitAny": true,
+        "noImplicitReturns": true
+    },
+    "include": [
+        "app.js",
+        "typedef.d.ts"
+    ],
+}
