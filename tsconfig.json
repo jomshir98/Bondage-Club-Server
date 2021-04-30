@@ -11,7 +11,9 @@
                 "node_modules/*"
             ]
         },
-        "noEmit": true
+        "noEmit": true,
+
+        "noImplicitAny": true
     },
     "include": [
         "app.js",
