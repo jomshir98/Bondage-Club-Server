@@ -1099,7 +1099,7 @@ function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 function ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source) {
 	if (CR == null) { return; }
 
-	if (CR.Account.some(C => C.OnlineSharedSettings?.GameVersion == "R66")) {
+	if (CR.Account.some(C => C.OnlineSharedSettings?.GameVersion == "R67")) {
 		const roomData = ChatRoomGetData(CR, SourceMemberNumber, true);
 		if (Source) Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
 		else IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
@@ -1157,9 +1157,7 @@ function ChatRoomSyncMemberJoin(CR, Character) {
 	}
 
 	Character.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
-
-	if (!ChatRoomSyncToOldClients(CR, Character.MemberNumber))
-		ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
+	ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
 }
 
 /**
@@ -1175,8 +1173,7 @@ function ChatRoomSyncMemberLeave(CR, SourceMemberNumber) {
 	leaveData.SourceMemberNumber = SourceMemberNumber;
 
 	// Sends the full packet to everyone in the room
-	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberLeave", leaveData);
+	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberLeave", leaveData);
 }
 
 /**
@@ -1191,28 +1188,6 @@ function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
 	// Sends the full packet to everyone in the room
 	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
 		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncRoomProperties", ChatRoomGetData(CR, SourceMemberNumber, false));
-}
-
-/**
- * Syncs the room data with all of it's members
- * @param {Chatroom} CR
- * @param {number} SourceMemberNumber
- * @param {number} MemberNumber1
- * @param {number} MemberNumber2
- */
-function ChatRoomSyncSwapPlayers(CR, SourceMemberNumber, MemberNumber1, MemberNumber2) {
-	// Exits right away if the chat room was destroyed
-	if (CR == null) return;
-
-	// Builds the room data
-	let swapData = {};
-
-	swapData.MemberNumber1 = MemberNumber1;
-	swapData.MemberNumber2 = MemberNumber2;
-
-	// Sends the full packet to everyone in the room
-	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncSwapPlayers", swapData);
 }
 
 /**
@@ -1444,7 +1419,11 @@ function ChatRoomAdmin(data, socket) {
 				if ((Acc != null) && (Acc.ChatRoom != null)) {
 					Acc.ChatRoom.Account[TargetAccountIndex] = DestinationAccount;
 					Acc.ChatRoom.Account[DestinationAccountIndex] = TargetAccount;
-					ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+					let newPlayerOrder = [];
+					for (let i = 0; i < Acc.ChatRoom.Account.length; i++) {
+						newPlayerOrder.push(Acc.ChatRoom.Account[i].MemberNumber);
+					}
+					ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber, newPlayerOrder);
 				}
 				return;
 			}
@@ -1471,29 +1450,40 @@ function ChatRoomAdmin(data, socket) {
 						}
 					}
 					else if ((data.Action == "MoveLeft") && (A != 0)) {
-						var MovedAccount = Acc.ChatRoom.Account[A];
+						let MovedAccount = Acc.ChatRoom.Account[A];
 						Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account[A - 1];
 						Acc.ChatRoom.Account[A - 1] = MovedAccount;
+						let newPlayerOrder = [];
+						for (let i = 0; i < Acc.ChatRoom.Account.length; i++) {
+							newPlayerOrder.push(Acc.ChatRoom.Account[i].MemberNumber);
+						}
 						Dictionary.push({Tag: "TargetCharacterName", Text: MovedAccount.Name, MemberNumber: MovedAccount.MemberNumber});
 						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 						if ((data.Publish != null) && (typeof data.Publish === "boolean") && data.Publish) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveLeft", "Action", null, Dictionary);
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber, newPlayerOrder);
 					}
 					else if ((data.Action == "MoveRight") && (A < Acc.ChatRoom.Account.length - 1)) {
-						var MovedAccount = Acc.ChatRoom.Account[A];
+						let MovedAccount = Acc.ChatRoom.Account[A];
 						Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account[A + 1];
 						Acc.ChatRoom.Account[A + 1] = MovedAccount;
+						let newPlayerOrder = [];
+						for (let i = 0; i < Acc.ChatRoom.Account.length; i++) {
+							newPlayerOrder.push(Acc.ChatRoom.Account[i].MemberNumber);
+						}
 						Dictionary.push({Tag: "TargetCharacterName", Text: MovedAccount.Name, MemberNumber: MovedAccount.MemberNumber});
 						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 						if ((data.Publish != null) && (typeof data.Publish === "boolean") && data.Publish) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveRight", "Action", null, Dictionary);
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber, newPlayerOrder);
 					}
 					else if (data.Action == "Shuffle") {
-						for (var X = 0; X < Acc.ChatRoom.Account.length; X++)
-							Acc.ChatRoom.Account.sort(() => Math.random() - 0.5);
+						let newPlayerOrder = []
+						Acc.ChatRoom.Account.sort(() => Math.random() - 0.5);
+						for (let i = 0; i < Acc.ChatRoom.Account.length; i++) {
+							newPlayerOrder.push(Acc.ChatRoom.Account[i].MemberNumber);
+						}
 						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerShuffle", "Action", null, Dictionary);
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber, newPlayerOrder);
 					}
 					else if ((data.Action == "Promote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) < 0)) {
 						Acc.ChatRoom.Admin.push(Acc.ChatRoom.Account[A].MemberNumber);
