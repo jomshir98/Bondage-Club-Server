@@ -1,3 +1,5 @@
+// @ts-check
+
 "use strict";
 require('newrelic');
 const base64id = require("base64id");
@@ -58,6 +60,7 @@ var DatabaseName = process.env.DATABASE_NAME || "BondageClubDatabase";
 var PasswordResetProgress = [];
 var NodeMailer = require("nodemailer");
 var MailTransporter = NodeMailer.createTransport({
+	// @ts-ignore
 	host: "mail.bondageprojects.com",
 	Port: 465,
 	secure: true,
@@ -118,6 +121,7 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				// If there is trusted forward header set by proxy, use that instead
 				// But only trust the last hop!
 				if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
+					// @ts-ignore
 					const hops = socket.handshake.headers[IP_CONNECTION_PROXY_HEADER].split(",");
 					address = hops[hops.length-1].trim();
 				}
@@ -1130,7 +1134,7 @@ function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 
 /**
  * Sends the newly joined player to all chat room members
- * @param {ChatRoom} CR
+ * @param {Chatroom} CR
  * @param {Account} Character
  */
 function ChatRoomSyncMemberJoin(CR, Character) {
@@ -1796,7 +1800,7 @@ function AccountLovership(data, socket) {
 		// Update the lovership and delete all unnecessary information
 		function AccountUpdateLovership(Lovership, MemberNumber, CurrentSocket = socket, Emit = true) {
 			var newLovership = Lovership.slice();
-			for (var L = newLovership.length - 1; L >= 0; L--) {
+			for (let L = newLovership.length - 1; L >= 0; L--) {
 				delete newLovership[L].BeginEngagementOfferedByMemberNumber;
 				delete newLovership[L].BeginWeddingOfferedByMemberNumber;
 				if (newLovership[L].BeginDatingOfferedByMemberNumber) newLovership.splice(L, 1);
