@@ -1028,7 +1028,7 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 {
 	// Exits right away if the chat room was destroyed
-	if (CR == null) return;
+	if (CR == null) return undefined;
 
 	// Builds the room data
 	const R = {
@@ -1098,7 +1098,7 @@ function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
  * @returns {boolean} if any data was sent
  */
 function ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source) {
-	if (CR == null) { return; }
+	if (CR == null) { return false; }
 
 	if (CR.Account.some(C => C.OnlineSharedSettings?.GameVersion == "R67")) {
 		const roomData = ChatRoomGetData(CR, SourceMemberNumber, true);
