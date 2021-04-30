@@ -1,4 +1,3 @@
-// @ts-check
 
 "use strict";
 require('newrelic');
@@ -60,7 +59,6 @@ var DatabaseName = process.env.DATABASE_NAME || "BondageClubDatabase";
 var PasswordResetProgress = [];
 var NodeMailer = require("nodemailer");
 var MailTransporter = NodeMailer.createTransport({
-	// @ts-ignore
 	host: "mail.bondageprojects.com",
 	Port: 465,
 	secure: true,
